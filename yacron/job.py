@@ -43,8 +43,7 @@ class StreamReader:
         self.discarded_lines = 0
 
     async def _read(self, stream):
-        #prefix = "[{} {}] ".format(self.job_name, self.stream_name)
-        prefix = ""
+        prefix = "[{} {}] ".format(self.job_name, self.stream_name)
         limit_top = self.save_limit // 2
         limit_bottom = self.save_limit - limit_top
         while True:
