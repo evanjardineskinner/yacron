@@ -1,9 +1,11 @@
 import asyncio
 import asyncio.subprocess
 import logging
+import codecs
 import os
 import sys
 import time
+import logging
 from email.mime.text import MIMEText
 from socket import gethostname
 from typing import Any, Awaitable, Dict, List, Optional  # noqa
@@ -17,7 +19,7 @@ import jinja2
 from yacron.config import JobConfig
 
 logger = logging.getLogger('yacron')
-
+PIPE_MAX = 65535
 
 if 'HOSTNAME' not in os.environ:
     os.environ['HOSTNAME'] = gethostname()
@@ -46,20 +48,30 @@ class StreamReader:
         prefix = "[{} {}] ".format(self.job_name, self.stream_name)
         limit_top = self.save_limit // 2
         limit_bottom = self.save_limit - limit_top
+        stdout_utf8 = codecs.getwriter('utf-8')(sys.stdout)
         while True:
-            line = (await stream.readline()).decode("utf-8")
-            if not line:
-                return
-            sys.stdout.write(prefix + line)
-            sys.stdout.flush()
-            if self.save_limit > 0:
-                if len(self.save_top) < limit_top:
-                    self.save_top.append(line)
-                else:
-                    if len(self.save_bottom) == limit_bottom:
-                        del self.save_bottom[0]
-                        self.discarded_lines += 1
-                    self.save_bottom.append(line)
+            try:
+                try:
+                    line = (await stream.readuntil()).decode("utf-8")
+                except:
+                    line = (await stream.read(PIPE_MAX)).decode("utf-8")
+                    if line:
+                        line = line + "\n"
+                if not line:
+                    return
+                sys.stdout.write(prefix + line)
+                sys.stdout.flush()
+                if self.save_limit > 0:
+                    if len(self.save_top) < limit_top:
+                        self.save_top.append(line)
+                    else:
+                        if len(self.save_bottom) == limit_bottom:
+                            del self.save_bottom[0]
+                            self.discarded_lines += 1
+                        self.save_bottom.append(line)
+            except Exception as e:
+                logging.exception(e)
+                sys.stderr.flush()
 
     async def join(self) -> str:
         await self._reader
@@ -212,6 +224,7 @@ class RunningJob:
             self.execution_deadline = (time.perf_counter() +
                                        self.config.executionTimeout)
 
+        kwargs['limit'] = PIPE_MAX
         self.proc = await create(*cmd, **kwargs)
 
         if self.config.captureStderr:
