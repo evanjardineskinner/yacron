@@ -215,6 +215,7 @@ class RunningJob:
                 env[envvar['key']] = envvar['value']
                 self.env = env
             kwargs['env'] = env
+        kwargs['close_fds'] = False
         logger.debug("%s: will execute argv %r", self.config.name, cmd)
         if self.config.captureStderr:
             kwargs['stderr'] = asyncio.subprocess.PIPE
