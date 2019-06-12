@@ -101,6 +101,7 @@ class Cron:
                              job.name, job.schedule_unparsed)
                 await self.launch_scheduled_job(job)
             else:
+                now=now.replace(second=0)
                 if isinstance(job.schedule,CronTab) and job.schedule.test(now):
                     logger.debug("Job %s (%s) is scheduled for now",
                              job.name, job.schedule_unparsed)
